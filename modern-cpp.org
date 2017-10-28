@@ -1,0 +1,727 @@
+#+TITLE: Modern C++
+
+* Rvalue Reference
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream>
+void printInt(int& i) { std::cout << "lvalue reference: " << i << std::endl; }
+void printInt(int&& i) { std::cout << "rvalue reference: " << i << std::endl; }
+
+int main() {
+  int i = 6;
+  printInt(i); // lvalue reference
+  printInt(6); // rvalue reference
+}
+#+END_SRC
+
+#+RESULTS:
+| lvalue | reference: | 6 |
+| rvalue | reference: | 6 |
+
+** Moving Semantics
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream>
+class boVector {
+  int size;
+  double* arr;
+public:
+  explicit boVector(int s) {
+    size = s;
+    arr = new double[size];
+    for (int i = 0; i < s; i++)
+      arr[i] = i;
+  }
+
+  boVector(const boVector& rhs) { // Copy constructor
+    size = rhs.size;
+    arr = new double[size];
+    for (int i = 0; i < size; i++)
+      arr[i] = rhs.arr[i];
+  }
+
+  boVector(boVector&& rhs) { // Move constructor
+    size = rhs.size;
+    arr = rhs.arr;
+    rhs.arr = nullptr;
+  }
+
+  void print() {
+    for (int i = 0; i < size; i++)
+      std::cout << arr[i] << std::endl;
+  }
+
+  ~boVector() { delete arr; }
+};
+
+void foo(boVector v) {
+  v.print();
+}
+
+void foo_by_ref(boVector& v) {
+  v.print();
+}
+
+boVector createBoVector() {
+  boVector v(10);
+  return v;
+}
+
+int main() {
+  boVector reusable = createBoVector();
+  foo(reusable); // call copy constructor to make a copy of reusable,
+                 // then pass to foo => costly
+  foo(std::move(reusable)); // call move constructor, efficient as foo_by_ref
+                            // after calling, reusable.arr = nullptr
+  foo(createBoVector()); // call move constructor (shallow copy)
+}
+#+END_SRC
+
+#+RESULTS:
+| 0 |
+| 1 |
+| 2 |
+| 3 |
+| 4 |
+| 5 |
+| 6 |
+| 7 |
+| 8 |
+| 9 |
+| 0 |
+| 1 |
+| 2 |
+| 3 |
+| 4 |
+| 5 |
+| 6 |
+| 7 |
+| 8 |
+| 9 |
+| 0 |
+| 1 |
+| 2 |
+| 3 |
+| 4 |
+| 5 |
+| 6 |
+| 7 |
+| 8 |
+| 9 |
+
+Note:
+1. The most useful place for rvalue reference is overloading copy constructor
+and copy assignment operator to achieve move semantics.
+#+BEGIN_SRC C++
+class X {
+  X(const X& rhs);
+  X(X&& rhs);
+
+  X& X::operator=(const X& rhs);
+  X& X::operator=(X&& rhs);
+};
+#+END_SRC
+
+2. Move semantics is implemented for all STL containers
+
+** Perfect Forwarding
+#+BEGIN_SRC C++
+void foo(boVector arg);
+
+template<typename T>
+void relay(T arg) {
+  foo(arg);
+}
+#+END_SRC
+We want relay function:
+1. No costly and unnecessary copy constructor of boVector is made
+2. rvalue is forwarded as rvalue, and lvalue is forwarded as lvalue to foo function
+#+BEGIN_SRC C++
+template<typename T>
+void relay(T&& arg) {
+  foo(std::forward<T>(arg));
+}
+#+END_SRC
+
+** Universal Reference
+T&& is Universal Reference: rvalue, lvalue, const, non-const, etc ...
+Conditions:
+1. T is a template type
+2. Type deduction (reference collasing) happens to T
+T& & => T&
+T& && => T&
+T&& & => T&
+T&& && => T&&
+
+relay(9); => T = int&& => T&& = int&& && = int&&
+relay(x); => T = int&  => T&& = int& && = int&
+
+* Initializer List
+** C++03
+#+BEGIN_SRC C++ :includes <vector>
+int arr[4] = {3, 2, 4, 5};
+
+std::vector<int> v;
+v.push_back(3);
+v.push_back(2);
+v.push_back(4);
+v.push_back(5);
+#+END_SRC
+
+** C++11
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <vector>
+std::vector<int> v = {3, 4, 1, 9};   // Calling initializer_list constructor
+#+END_SRC
+
+#+RESULTS:
+
+All the relevant STL containers have been updated to accept initializer_list.
+
+** Define your own initializer_list constructor
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <vector>
+#include <initializer_list>
+using namespace std;
+
+class BoVector {
+   vector<int> m_vec;
+   public:
+   BoVector(const initializer_list<int>& v) {
+      for (initializer_list<int>::iterator itr = v.begin(); itr!=v.end(); ++ itr)
+         m_vec.push_back(*itr);
+   }
+};
+
+int main() {
+  BoVector v1 = {0, 2, 3, 4};
+  BoVector v2{0, 2, 3, 4};   // effectively the same
+}
+#+END_SRC
+
+#+RESULTS:
+
+** Automatic normal Initialization
+#+BEGIN_SRC C++ :flags -std=c++11
+class Rectangle {
+   public:
+   Rectangle(int height, int width, int length){ }
+};
+
+void draw_rect(Rectangle r) {}
+
+int main() {
+   draw_rect({5, 6, 9});  // Rectangle{5,6,9} is automatically called
+}
+#+END_SRC
+
+#+RESULTS:
+
+Note: use it with caution.
+1. Not very readable, even with the help of IDE. Funcion name rarely indicates
+   the type of parameter the function takes.
+2. Function could be overloaded with differenct parameter types.
+
+void draw_rect(Triangle t);
+
+* Uniform Initialization
+** C++ 03
+#+BEGIN_SRC C++ :includes <string>
+class Dog {     // Aggregate class or struct
+   public:
+      int age;
+      std::
+string name;
+};
+
+int main() {
+  Dog d1 = {5, "Henry"};   // Aggregate Initialization
+}
+#+END_SRC
+
+** C++ 11 extended the scope of curly brace initialization
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <string>
+class Dog {
+   public:
+      Dog(int age, std::string name) { }
+};
+
+int main() {
+  Dog d1 = {5, "Henry"}; 
+}
+#+END_SRC
+
+#+RESULTS:
+
+
+** Uniform Initialization Search Order
+1. Initializer_list constructor
+2. Regular constructor that takes the appropriate parameters.
+3. Aggregate initializer.
+
+#+BEGIN_SRC C++
+Dog d1{3};
+
+class Dog {
+   public:
+   int age;                                // 3rd choice
+
+   Dog(int a) {                            // 2nd choice
+      age = a;
+   }
+
+   Dog(const initializer_list<int>& vec) { // 1st choice
+      age = *(vec.begin());      
+   }
+};
+#+END_SRC
+
+* auto type
+It's static type, no run-time cost, fat-free. It also makes code easier to maintain.
+
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <vector>
+std::vector<int> vec = {2, 3, 4, 5};
+for (auto it = vec.begin(); it!=vec.end(); ++ it)
+    vec.push_back(*it);
+
+auto a = 6;    // a is a integer
+auto b = 9.6;  // b is a double
+auto c = a;    // c is an integer
+auto const x = a;   // int const x = a
+auto& y = a;        // int& y = a
+#+END_SRC
+
+#+RESULTS:
+
+* foreach
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream> <vector> <algorithm>
+std::vector<int> v = {2, 3, 4, 5};
+for (auto i: v) { // works on any class that has begin() and end()
+  std::cout << i ;    // readonly access
+}
+for (auto& i: v) {
+  i++;                 // changes the values in v
+}                       // and also avoids copy construction
+auto x = std::begin(v);  // Same as: int x = v.begin();
+
+int arr[4] = {3, 2, 4, 5};
+auto y = std::begin(arr); // y == 3
+auto z = std::end(arr);   // z == 5
+
+auto print = [](const int& n) { std::cout << " " << n; };
+std::for_each(v.begin(), v.end(), print);
+std::for_each(v.begin(), v.end(), [](int &n){ n++; });
+#+END_SRC
+
+* nullptr
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream>
+void foo(int i) { std::cout << "foo_int" << std::endl; }
+void foo(char* pc) { std::cout << "foo_char*" << std::endl; }
+
+int main() {
+   //foo(NULL);    // Ambiguity in C++03
+
+   // C++ 11
+   foo(nullptr); // call foo(char*)
+}
+#+END_SRC
+
+* enum class
+** C++03
+#+BEGIN_SRC C++ :includes <iostream>
+enum apple {green_a, red_a};
+enum orange {big_o, small_o};
+apple a = green_a;
+orange o = big_o;
+
+if (a == o) 
+  std::cout << "green apple and big orange are the same\n";
+else
+  std::cout << "green apple and big orange are not the same\n";
+#+END_SRC
+
+#+RESULTS:
+: green apple and big orange are the same
+
+** C++11
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream>
+enum class apple {green, red};
+enum class orange {big, small};
+apple a = apple::green;
+orange o = orange::big;
+
+if (a == o) 
+  cout << "green apple and big orange are the same\n";
+else
+  cout << "green apple and big orange are not the same\n";
+
+// Compile fails because we haven't define ==(apple, orange)
+#+END_SRC
+
+* static_assert
+#+BEGIN_SRC C++
+// run-time assert
+assert( myPointer != NULL );
+
+// Compile time assert (C++ 11)
+static_assert( sizeof(int) == 4 );
+#+END_SRC
+
+* Delegating Constructor 
+Calling another constructor (Java's feature)
+
+** C++03
+#+BEGIN_SRC C++
+class Dog {
+  init() { ... };
+public:
+  Dog() { init(); }
+  Dog(int a) { init(); doOtherThings(); }
+};
+#+END_SRC
+
+Cons: 1. Cumbersome code.
+      2. init() could be invoked by other functions.
+
+** C++11
+#+BEGIN_SRC C++ :flags -std=c++11
+class Dog {
+  int age = 9;
+public:
+  Dog() { }
+  Dog(int a) : Dog() { doOtherThings(); }
+};
+#+END_SRC
+
+Limitation: Dog() has to be called first.
+
+* override (for virtual function)
+To avoid inadvertently create new function in derived classes.
+** C++03
+#+BEGIN_SRC C++
+class Dog {
+   virtual void A(int);
+   virtual void B() const;
+}
+
+class Yellowdog : public Dog {
+   virtual void A(float);  // Created a new function
+   virtual void B(); // Created a new function 
+}
+#+END_SRC
+
+** C++11
+#+BEGIN_SRC C++ :flags -std=c++11
+class Dog {
+   virtual void A(int);
+   virtual void B() const;
+   void C();
+}
+
+class Yellowdog : public Dog {
+   virtual void A(float) override;  // Error: no function to override
+   virtual void B() override;       // Error: no function to override
+   void C() override;               // Error: not a virtual function
+}
+#+END_SRC
+
+* final (for virtual function and for class)
+#+BEGIN_SRC C++
+class Dog final {    // no class can be derived from Dog
+   ...
+};
+   
+class Dog {
+   virtual void bark() final;  // No class can override bark() 
+};
+#+END_SRC
+
+* Compiler Generated Functions
+#+BEGIN_SRC C++
+class Dog {
+   Dog(int age) {}
+};
+
+Dog d1;  // Error: compiler will not generate the default constructor
+#+END_SRC
+
+#+BEGIN_SRC C++ :flags -std=c++11
+class Dog {
+   Dog(int age);
+   Dog() = default;    // Force compiler to generate the default constructor
+};
+#+END_SRC
+
+** C++03
+1. default constructor: generated if no constructor is defined by user
+2. copy constructor: generated if no 5, 6 declared by user
+3. copy assignment operator: generated if no 5, 6 declared by user
+4. destructor
+
+** C++11
+5. move constructor: generated if 2, 3, 4, 6 not declared by user
+6. move assignment operator: generated if 2, 3, 4, 5 no declared by user
+
+* delete
+** C++03
+#+BEGIN_SRC C++
+class Dog {
+public:
+  Dog(int age) {}
+};
+
+int main() {
+  Dog a(2);
+  Dog b(3.0); // 3.0 is converted from double to int
+  a = b;     // Compiler generated assignment operator
+}
+#+END_SRC
+
+To avoid this problem in C++03, put Dog(float age); in private section
+
+** C++11
+#+BEGIN_SRC C++ :flags -std=c++11
+class Dog {
+public:
+   Dog(int age) {}
+   Dog(double ) = delete;
+   Dog& operator=(const Dog&) = delete;
+}
+#+END_SRC
+
+* constexpr
+** C++03
+#+BEGIN_SRC C++
+int A() { return 3; }
+
+int main() {
+  int arr[6];    //OK
+  int arr[A()+3];   // Compile Error
+} 
+#+END_SRC
+
+** C++11
+#+BEGIN_SRC C++ :flags -std=c++11
+constexpr int A() { return 3; }  // Forces the computation to happen 
+                                 // at compile time.
+
+// Write faster program with constexpr
+constexpr int cubed(int x) { return x * x * x; }
+
+int main() {
+  int arr[A()+3];   // Create an array of size 6
+  int y = cubed(1789);  // computed at compile time
+}
+#+END_SRC
+
+#+RESULTS:
+
+Function cubed() is:
+1. Super fast. It will not consume run-time cycles
+2. Super small. It will not occupy space in binary.
+
+* New String Literals
+
+** C++ 03
+#+BEGIN_SRC C++
+char* a = "string";
+#+END_SRC
+** C++11
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream>
+const char*     a = u8"string";        // to define an UTF-8 string. 
+const char16_t* b = u"string";         // to define an UTF-16 string. 
+const char32_t* c = U"string";         // to define an UTF-32 string. 
+const char*     d = R"foo(string)foo"; // to define raw string. 
+#+END_SRC
+
+#+RESULTS:
+
+* lambda function
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream> <vector>
+using namespace std;
+
+template<typename func>
+void filter(func f, vector<int> arr) {
+   for (auto i: arr) {
+      if (f(i))
+         cout << i << " ";
+   }
+}
+
+int main() {
+   vector<int> v = {1, 2, 3, 4, 5, 6 };
+
+   filter([](int x) {return (x>3);},  v);    // Output: 4 5 6
+   filter([](int x) {return (x>2 && x<5);},  v); // Output: 3 4
+
+   int y = 4;  
+   filter([&](int x) {return (x>y);},  v);    // Output: 5 6
+   //Note: [&] tells compiler that we want variable capture
+}
+#+END_SRC
+
+#+RESULTS:
+: 4 5 6 3 4 5 6
+
+* User defined Literals
+
+C++ went a long way to make user defined types (classes)
+to behave same as buildin types.
+User defined literals pushes this effort even further
+
+** Old C++
+#+BEGIN_SRC C++
+long double height = 3.4;
+
+// Remember in high school physics class?
+height = 3.4cm;
+ratio = 3.4cm / 2.1mm; 
+#+END_SRC
+
+Why we don't do that anymore?
+ 1. No language support
+ 2. Run time cost associated with the unit translation
+
+** C++ 11
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream>
+  long double operator"" _cm(long double x) { return x * 10; }
+  long double operator"" _m(long double x) { return x * 1000; }
+  long double operator"" _mm(long double x) { return x; }
+
+  int operator"" _bin(const char* str, size_t l) {
+    int ret = 0;
+    for (int i = 0; i < l; i++) {
+      ret = ret << 1;
+      if (str[i] == '1')
+        ret += 1;
+    }
+    return ret;
+  }
+
+  int main() {
+    long double height = 3.4_cm;
+    std::cout << height  << std::endl;              // 34
+    std::cout << (height + 13.0_m)  << std::endl;   // 13034
+    std::cout << (130.0_mm / 13.0_m)  << std::endl; // 0.01
+
+    std::cout << "110"_bin << std:: endl; // 6
+  }
+#+END_SRC
+
+#+RESULTS:
+|    34 |
+| 13034 |
+|  0.01 |
+|     6 |
+
+Note: add constexpr to make the translation happen in compile time.
+
+Restriction: it can only work with following paramters:
+   char const*
+   unsigned long long
+   long double
+   char const*, std::size_t
+   wchar_t const*, std::size_t
+   char16_t const*, std::size_t
+   char32_t const*, std::size_t
+Note: return value can be of any types.
+
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream>
+int operator"" _hex(char const* str, size_t l) { 
+  // Convert hexdecimal formated str to integer ret
+  int ret = 0;
+  return ret;
+}
+
+int operator"" _oct(char const* str, size_t l) { 
+  // Convert octal formated str to integer ret
+  int ret = 0;
+  return ret;
+}
+
+int main() {
+  std::cout << "FF"_hex << std::endl;  // 255
+  std::cout << "40"_oct << std::endl;  // 32
+}
+#+END_SRC
+
+#+RESULTS:
+| 0 |
+| 0 |
+
+* Variadic Template
+A template that can take any number of template arguments of any type.
+Both class and function templates can be variadic.
+#+BEGIN_SRC C++ :flags -std=c++11
+template<typename... arg>
+class BoTemplate;
+
+BoTemplate<float> t1;
+BoTemplate<int, long, double, float> t2;
+BoTemplate<int, std::vector<double>> t3;
+
+BoTemplate<> t4;
+
+
+// Combination of variadic and non-variadic argument
+template<typename T, typename... arg>
+class BoTemplate;
+
+BoTemplate<> t4;  // Error
+BoTemplate<int, long, double, float> t2;  // OK
+
+
+// Define a default template argument
+template<typename T = int, typename... arg>
+class BoTemplate;
+#+END_SRC
+
+** Template Alias
+#+BEGIN_SRC C++
+template<class T> class Dog { /* ... */ };
+template<class T>
+using DogVec = std::vector<T, Dog<T>>;
+
+DogVec<int> v;  // Same as: std::vector<int, Dog<int>>
+#+END_SRC
+
+* decltype
+#+BEGIN_SRC C++
+const int& foo();      // Declare a function foo()
+decltype(foo())  x1;  //  type is const int&
+
+struct S { double x; };
+decltype(S::x)   x2;  //  x2 is double
+
+auto s = make_shared<S>();
+decltype(s->x)   x3;  //  x3 is double
+
+int i;
+decltype(i)      x4;  //  x4 is int  
+
+float f;              
+decltype(i + f)  x5;   // x5 is float
+
+// decltype turns out to be very useful for template generic programming
+template<type X, type Y>
+void foo(X x, Y y) {
+  ...
+  decltype(x+y) z;
+  ...
+}
+
+// How about return type needs to use decltype?
+template<type X, type Y>
+decltype(x+y) goo(X x, Y y) {      // Error: x & y are undefined 
+  return  x + y;
+}
+
+// Combining auto and decltype to implement templates with trailing return type
+template<type X, type Y>
+auto goo(X x, Y y) -> decltype(x+y) {
+  return  x + y;
+}
+#+END_SRC
+
+* Thread Memory Model
+Why people use thread?
+ 1. Process multiple event stream
+ 2. Take advantage of multiple cores.
+* Smart Pointer
+** Shared Pointer
+** Weak Pointer
+** Unique Pointer

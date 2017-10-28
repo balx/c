@@ -1,0 +1,537 @@
+#+TITLE: Advanced C++
+
+* const
+A compile time constraint that an object can not be modified
+
+** const variables
+#+BEGIN_SRC C++
+  const int i = 9;
+  //i = 6; // error: assignment of read-only variable
+#+END_SRC
+
+#+RESULTS:
+
+** const pointers
+If const is on the left of *, data is const. If const is on the right of *, pointer is const.
+
+#+BEGIN_SRC C++ :flags -std=c++11
+  const int *p1 = &i; // data is const, pointer is not
+  p1++;
+
+  int* const p2; // pointer is const, data is not
+
+  const int* const p3; // data and pointer are both const
+#+END_SRC
+
+** const parameters
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream>
+
+void func(int &a) {
+  std::cout << "Ref" << std::endl;
+}
+
+void func(const int &a) {
+  std::cout << "Const Ref" << std::endl;
+}
+
+int main() {
+  int a = 0;
+  func(a); // a is lvalue
+  func(1); // 1 is rvalue
+}
+#+END_SRC
+
+#+RESULTS:
+| Ref   |     |
+| Const | Ref |
+
+** const functions
+#+BEGIN_SRC C++ :flag -std=c++11
+#include <iostream>
+
+class Dog {
+public:
+  void getName() { std::cout << "getName()" << std::endl; }
+  void getName() const { std::cout << "getName() const" << std::endl; }
+};
+
+int main() {
+  Dog d1;
+  d1.getName(); // output: getName()
+  const Dog d2;
+  d2.getName(); // output: getName() const
+}
+#+END_SRC
+
+#+RESULTS:
+| getName() |       |
+| getName() | const |
+
+** const iterators
+
+** Logic Constness and Bitwise Constness
+#+BEGIN_SRC C++ :flag -std=c++11
+#include <vector>
+using namespace std;
+
+class BigArray {
+  vector<int> v;
+  mutable int counter; // mutable to change in const function
+
+  int* v2;
+public:
+  int getItem(int index) const {
+    counter++;
+    //const_cast<BigArray*>(this)->counter++;
+    return v[index];
+  }
+ 
+  void setV2Item(int index, int x) const {
+    *(v2+index) = x; // change member v2, but still can be const function
+  }
+};
+
+int main() {
+
+}
+#+END_SRC
+
+#+RESULTS:
+
+* Assignment to Self in Assignment Operator
+* Resource Acquisition is Initialization (context manager)
+* Static Initialization Order Fiasco
+** Problem description
+#+NAME: Dog
+#+BEGIN_SRC C++ :includes <iostream> <string>
+Cat c("Smokey");
+class Dog {
+  std::string _name;
+public:
+  void bark() {
+    std::cout << "Gogogo" << std::endl;
+    c.meow();
+  }
+
+  Dog(char *name) {
+    std::cout << "Constructing Dog " << name << std::endl;
+    _name = name;
+  }
+};
+#+END_SRC
+
+#+NAME: Cat
+#+BEGIN_SRC C++ :includes <iostream> <string>
+extern Dog d;
+class Cat {
+  std::string _name;
+public:
+  void meow() {
+    std::cout << "Meow" << std::endl;
+    d.bark();
+  }
+
+  Cat(char *name) {
+    std::cout << "Constructing Cat " << name << std::endl;
+    _name = name;
+  }
+};
+#+END_SRC
+
+#+NAME main
+#+BEGIN_SRC C++
+Dog d("Gunner");
+
+ing main() {
+  d.bark();
+  return 0;
+}
+#+END_SRC
+
+** Solution
+using Singleton Design pattern
+
+* Resource Managing Class
+Create a class with a pointer member
+#+BEGIN_SRC C++
+class Dog {
+  string* _name;
+public:
+  Dog(string name) {
+    _name = new string(name);
+  }
+  ~Dog() {
+    delete _name;
+  }
+  void printName() const {
+    std::cout << _name << std::endl;
+  }
+};
+#+END_SRC
+
+STL container of this class
+#+BEGIN_SRC C++
+vector<Dog> dogs;
+dogs.push_back(new Dog("Gunner"));
+dogs.back().printName(); // error
+#+END_SRC
+
+Solution:
+1. Define copy constructor and assignment operator
+2. Delete default copy constructor and assignment operator, then use vector<Dog *>
+* Virtual Constructor
+#+BEGIN_SRC C++
+class Dog {
+public:
+  virtual Dog *clone() { return (new Dog(*this)); } // co-variant return type
+};
+
+class YellowDog : public Dog {
+public:
+  virtual YellowDog *clone() { return (new YellowDog(*this)); }
+};
+
+void foo(Dog *d) { // d is a YellowDog
+  Dog *c = new Dog(*d); // c is a Dog
+  Dog *b = d->clone(); // b is a YellowDog
+}
+
+int main() {
+  YellowDog d;
+  foo(&d);
+}
+#+END_SRC
+
+* Implicit Type Conversion
+** Implicit Standard Type Conversion
+** Implicit User Defined Type Conversion
+- Use constructor that can accept a single parameter to convert othe types of object into your class
+- Use the type conversion function to convert an object of your class into other types
+#+BEGIN_SRC C++
+class dog {
+public:
+  dog(string name) { m_name = name; } // NO explicit
+  // if you only want to define a constructor and no implicit conversion,
+  // always put "explicit" before the constructor to avoid inadvertent
+  // type conversion
+  operator string () const { return m_name; }
+private:
+  string m_name;
+};
+
+int main() {
+  string dogname = "Bob";
+  dog d = dogname;
+}
+#+END_SRC
+* Explicit Type Conversion (Casting)
+** static_cast
+#+BEGIN_SRC C++
+int i = 9;
+float f = static_cast<float>(i); // convert object from one type to another
+dog d1 = static_cast<dog>(string("Bob")); // type conversion needs to be defined
+dog *pd = static_cast<dog*>(new yellowdog()); // convert pointer/reference from one type
+                                              // to a related type (down/up cast)
+#+END_SRC
+** dynamic_cast
+#+BEGIN_SRC C++
+dog* pd = new yellowdog();
+yellowdog* py = dynamic_cast<yellowdog*>(pd);
+#+END_SRC
+- convert pointer/reference from one type to a related type (down cast)
+- run-time type check, if succeed, py == pd, otherwise pz == 0
+- require the 2 types to be polymorphic (have virtual function)
+** const_cast
+- only works on pointer/reference
+- only works on the same type
+#+BEGIN_SRC C++
+const char* str = "Hello, world";
+char* modifiable = const_cast<char*>(str);
+#+END_SRC
+** reinterpret_cast
+The most powerful/ultimate cast that can cast one pointer to any other type of pointer.
+#+BEGIN_SRC C++
+long p = 12534325;
+dog* d = reinterpret_cast<dog*>(p);
+#+END_SRC
+* Maintain is-a Relation for Public Inheritance
+#+BEGIN_SRC C++
+class dog {
+public:
+  void bark(int 5) { cout << "bark(int)" << endl; }
+  virtual void bark(string msg = "just a") {
+    cout << "I am " << msg << " dog" << endl;
+  }
+};
+
+class yellowdog : public dog {
+public:
+  using dog::bark;
+  virtual void bark(string msg = "a yellow") {
+    cout << "I am " << msg << " dog" << endl;
+  }
+};
+
+// virtual function is bound at run-time,
+// default parameter is bound at compile-time
+void func1() {
+  yellowdog* py = new yellowdog();
+  py->bark();
+  dog* pd = py;
+  pd->bark();
+}
+
+// the compiler searchs for bark function in yellowdog class
+// regardless of parameter and return type
+void func2() {
+  yellowdog* py = new yellowdog();
+  py->bark(5);
+
+}
+#+END_SRC
+* Static Polymorphism
+dynamic binding has a run-time cost of both time and memory (virtual table)
+#+BEGIN_SRC C++
+struct TreeNode {TreeNode *left, *right;}
+
+class Generic_Parser {
+public:
+  void parse_preorder(TreeNode* node) {
+    if (node) {
+      process_node(node);
+      parse_preorder(node->left);
+      parse_preorder(node->right);
+    }
+  }
+private:
+  virtual void process_node(TreeNode* node);
+};
+
+class EmployeeChart_Parser : public Generic_Parser {
+private:
+  void process_node(TreeNode* node) {
+    cout << "Customized process_node() for EmployeeChart_Parser" << endl;
+  }
+};
+
+int main() {
+  ...
+  EmployeeChart_Parser ep;
+  ep.parse_preorder(root);
+  ...
+}
+#+END_SRC
+
+Solution: TMP (Template Metaprogramming)
+#+BEGIN_SRC C++
+template <typename T>
+class Generic_Parser {
+public:
+  void parse_preorder(TreeNode* node) {
+    if (node) {
+      process_node(node);
+      parse_preorder(node->left);
+      parse_preorder(node->right);
+    }
+  }
+
+  void process_node(TreeNode* node) {
+    static_cast<T*>(this)->process_node(node);
+  }
+};
+
+class EmployeeChart_Parser : public Generic_Parser<EmployeeChart_Parser> {
+private:
+  void process_node(TreeNode* node) {
+    cout << "Customized process_node() for EmployeeChart_Parser" << endl;
+  }
+};
+
+int main() {
+  ...
+  EmployeeChart_Parser ep;
+  ep.parse_preorder(root);
+  ...
+}
+#+END_SRC
+
+However, the price of this solution is the cost of compile time.
+
+* Multiple Inheritance
+Interface Segregation Principle by using Pure Abstract Class
+#+BEGIN_SRC C++
+class File {
+public:
+  void open() = 0;
+};
+
+class InputFile : public File {
+public:
+  void read() = 0;
+};
+
+class OutputFile : public File {
+public:
+  void write() = 0;
+};
+
+class IOFile : public InputFile, OutputFile {
+public:
+  void read() {}
+  void write() {}
+  void open() {}
+}
+#+END_SRC
+* Code Reuse: Inheritance vs Composition
+** Inheritance
+#+BEGIN_SRC C++
+class BaseDog {
+  ...
+  ... // common activities
+};
+
+class BullDog : public BaseDog {
+  ... // call the common activities to perform more tasks.
+};
+
+class SheperdDog : public BaseDog {
+  ... // call the common activities to perform more tasks.
+};
+#+END_SRC
+
+** Composition
+#+BEGIN_SRC C++
+class ActivityManager {
+  ... // common activities
+};
+
+class Dog {
+  ...
+};
+
+class BullDog : public Dog {
+  ActivityManager* pActMngr;
+  ... // call the common activities through pActMngr
+};
+
+class IndoorActivityManager : public ActivityManager {
+
+};
+
+class OutdoorActivityManager : public ActivityManager {
+
+};
+#+END_SRC
+* using keyword
+#+BEGIN_SRC C++
+using namespace std;
+using std::cout;
+
+class B {
+public:
+  void f(int a);
+};
+
+class D: private B {
+public:
+  void g() {
+    using namespace std;
+    cout << "From D: \n";
+  }
+
+  void h() {
+    using std::cout;
+    cout << "From D: \n";
+  }
+
+  using B::f;
+};
+#+END_SRC
+* Koenig Lookup - Argument Dependent Lookup
+** Koenig Lookup
+#+BEGIN_SRC C++
+namespace A {
+  struct X {};
+  void g(X) { cout << "calling A::g()\n"; }
+}
+
+int main() {
+  A::X x1;
+  g(x1); // compiler lookups the function g in the namespace x1 defined
+}
+#+END_SRC
+
+#+BEGIN_SRC C++
+class A {
+public:
+  struct X {};
+  static void g(X) { cout << "calling A::g()\n"; }
+};
+
+int main() {
+  A::X x;
+  g(x); // Error
+}
+#+END_SRC
+
+#+BEGIN_SRC C++
+namespace A {
+  struct X {};
+  void g(X) { cout << "calling A::g()\n"; }
+}
+
+namespace C {
+  void g(A::X x) { cout << "calling C:g()\n"; }
+  void j() {
+    A::X x;
+    g(x);
+  }
+}
+
+int main() {
+  C::j(); // Error because the compiler found C::g and A::g
+}
+#+END_SRC
+
+** Name hiding: namespace
+#+BEGIN_SRC C++
+namespace A {
+  void g(ing x) { cout << "calling A::g()\n"; }
+
+  namespace C {
+    void g() { cout << "calling c::g()\n"; }
+    void j() {
+      using A::g;
+      g(8);
+    }
+  }
+}
+
+int main() {
+  A::C::j();
+}
+#+END_SRC
+
+** Namespace Design
+*** Practical Reason
+#+BEGIN_SRC C++
+std::cout << "Hi\n"; // calls std::operator<<
+
+std::cout std::<< "Hi\n";
+std::operator<<(std::cout, "Hi\n");
+#+END_SRC
+
+*** Theoretical Reason - Engineering Principle
+1. Functions that operate on class C and in a same namespace with C are part of C's interface
+2. Functions that are part of C's interface should be in the same namespace as C.
+
+#+BEGIN_SRC C++
+namespace A {
+  class C {
+  public:
+    void f() = 0;
+    void g() = 0;
+  };
+  ostream& operator<<(ostream&, const C&);
+}
+#+END_SRC
