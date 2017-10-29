@@ -1,5 +1,60 @@
 #+TITLE: Advanced C++
 
+* Memory Management
+** Stack segment
+Local variables are stored on stack segment and will be removed when the variables go out of scope
+#+BEGIN_SRC C++
+int* local() {
+  int local_variable = 1;
+  return &i; // return a pointer points to a local variable which is removed
+             // when the program goes out of this function => error
+}
+
+char* get_string() {
+  char str[] = "Hello";
+  return str; // str is not present after get_string returns
+}
+
+int main() {
+  local();
+}
+#+END_SRC
+
+** Heap segment
+The heap segment is managed by malloc, calloc, realloc, and free (new, delete operators)
+#+BEGIN_SRC C++ :includes <iostream>
+char* get_string() {
+  char* str = new char[6]; // stored in heap segment
+  *(str+0) = 'H';
+  *(str+1) = 'e';
+  *(str+2) = 'l';
+  *(str+3) = 'l';
+  *(str+4) = 'o';
+  *(str+5) = '\0';
+  return str; // string remains at str after get_string returns
+}
+
+int main() {
+  char *s = get_string();
+  std::cout << s << std::endl;
+  delete [] s;
+}
+#+END_SRC
+
+** Data segment
+The data segment contains any global or static variables which have a pre-defined value and can be modified.
+#+BEGIN_SRC C++ :includes <iostream>
+int* static_local() {
+  static int i = 10;
+  return &i;
+}
+int main() {
+  int *p = static_local();
+  std::cout << "address: " << &p << std::endl;
+  std::cout << "value: " << *p << std::endl;
+}
+#+END_SRC
+
 * const
 A compile time constraint that an object can not be modified
 
