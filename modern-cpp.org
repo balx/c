@@ -723,5 +723,135 @@ Why people use thread?
  2. Take advantage of multiple cores.
 * Smart Pointer
 ** Shared Pointer
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream> <string> <memory>
+class Dog {
+  std::string name;
+public:
+  Dog(std::string name) {
+    std::cout << "Constructor: " << name << std::endl;
+    this->name = name;
+  }
+  Dog() {
+    std::cout << "Constructor: No Name" << std::endl;
+    this->name = "No Name";
+  }
+  ~Dog() { std::cout << "Destructor: " << name << std::endl; }
+};
+
+void basic() {
+  std::shared_ptr<Dog> p(new Dog("Gunner"));
+  std::cout << "Number of pointers point to p: " << p.use_count() << std::endl;
+  {
+    std::shared_ptr<Dog> p1 = p;
+    std::cout << "Number of pointers point to p: " << p.use_count() << std::endl;
+  }
+  std::cout << "Number of pointers point to p: " << p.use_count() << std::endl;
+
+  std::shared_ptr<Dog> p1 = std::make_shared<Dog>("Tank"); // faster and safer
+}
+
+void custom_deleter() {
+  //std::shared_ptr<Dog> p1(new Dog[3]); // dog[1] and dog[2] have memory leaks
+  std::shared_ptr<Dog> p2(new Dog[3], [](Dog* p) { delete[] p; }); // all 3 dogs will be deleted
+}
+
+int main() {
+  basic();
+  custom_deleter();
+}
+#+END_SRC
+
+#+RESULTS:
+| Constructor: | Gunner |          |       |    |    |   |
+| Number       | of     | pointers | point | to | p: | 1 |
+| Number       | of     | pointers | point | to | p: | 2 |
+| Number       | of     | pointers | point | to | p: | 1 |
+| Constructor: | Tank   |          |       |    |    |   |
+| Destructor:  | Tank   |          |       |    |    |   |
+| Destructor:  | Gunner |          |       |    |    |   |
+| Constructor: | No     | Name     |       |    |    |   |
+| Constructor: | No     | Name     |       |    |    |   |
+| Constructor: | No     | Name     |       |    |    |   |
+| Destructor:  | No     | Name     |       |    |    |   |
+| Destructor:  | No     | Name     |       |    |    |   |
+| Destructor:  | No     | Name     |       |    |    |   |
+
 ** Weak Pointer
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream> <string> <memory>
+class Dog {
+  //std::shared_ptr<Dog> my_friend; // cyclic reference -> no destructor
+  std::weak_ptr<Dog> my_friend;
+  std::string name;
+public:
+  Dog(std::string name) {
+    std::cout << "Constructor: " << name << std::endl;
+    this->name = name;
+  }
+  ~Dog() { std::cout << "Destructor: " << name << std::endl; }
+  void make_friend(std::shared_ptr<Dog> f) { my_friend = f; }
+  void show_friend() {
+    if (!my_friend.expired())
+      std::cout << "My friend is: " << my_friend.lock()->name << std::endl;
+  }
+};
+
+int main() {
+  std::shared_ptr<Dog> p1(new Dog("Gunner"));
+  std::shared_ptr<Dog> p2(new Dog("Tank"));
+  p1->make_friend(p2);
+  p2->make_friend(p1);
+  p1->show_friend();
+}
+#+END_SRC
+
+#+RESULTS:
+| Constructor: | Gunner |     |      |
+| Constructor: | Tank   |     |      |
+| My           | friend | is: | Tank |
+| Destructor:  | Tank   |     |      |
+| Destructor:  | Gunner |     |      |
+
 ** Unique Pointer
+#+BEGIN_SRC C++ :flags -std=c++11 :includes <iostream> <string> <memory>
+class Dog {
+  std::string name;
+public:
+  Dog(std::string name) {
+    std::cout << "Constructor: " << name << std::endl;
+    this->name = name;
+  }
+  ~Dog() { std::cout << "Destructor: " << name << std::endl; }
+  void bark() { std::cout << name << " barks" << std::endl; }
+};
+
+void test_unique() {
+  std::unique_ptr<Dog> p1(new Dog("Gunner"));
+  //Dog* p2 = p1.release();
+  //p1.reset(new Dog("Tank"));
+  p1.reset(); // p1 = nullptr;
+  if (!p1)
+    std::cout << "p1 is empty.\n";
+  else
+    std::cout << "p1 is not empty.\n";
+}
+
+void move(std::unique_ptr<Dog> p) {
+  p->bark();
+}
+
+int main() {
+  test_unique();
+
+  std::unique_ptr<Dog> p(new Dog("Smokey"));
+  move(std::move(p));
+}
+#+END_SRC
+
+#+RESULTS:
+| Constructor: | Gunner |        |
+| Destructor:  | Gunner |        |
+| p1           | is     | empty. |
+| Constructor: | Smokey |        |
+| Smokey       | barks  |        |
+| Destructor:  | Smokey |        |
+
