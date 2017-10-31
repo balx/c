@@ -163,14 +163,14 @@ Cat c("Smokey");
 class Dog {
   std::string _name;
 public:
+  Dog(std::string name) {
+    std::cout << "Constructing Dog " << name << std::endl;
+    _name = name;
+  }
+
   void bark() {
     std::cout << "Gogogo" << std::endl;
     c.meow();
-  }
-
-  Dog(char *name) {
-    std::cout << "Constructing Dog " << name << std::endl;
-    _name = name;
   }
 };
 #+END_SRC
@@ -181,39 +181,43 @@ extern Dog d;
 class Cat {
   std::string _name;
 public:
+  Cat(std::string name) {
+    std::cout << "Constructing Cat " << name << std::endl;
+    _name = name;
+  }
+
   void meow() {
     std::cout << "Meow" << std::endl;
     d.bark();
   }
-
-  Cat(char *name) {
-    std::cout << "Constructing Cat " << name << std::endl;
-    _name = name;
-  }
 };
 #+END_SRC
 
-#+NAME main
-#+BEGIN_SRC C++
+#+BEGIN_SRC C++ :noweb yes
+<<Cat>>
+<<Dog>>
+
 Dog d("Gunner");
 
-ing main() {
+int main() {
   d.bark();
   return 0;
 }
 #+END_SRC
+
+#+RESULTS:
 
 ** Solution
 using Singleton Design pattern
 
 * Resource Managing Class
 Create a class with a pointer member
-#+BEGIN_SRC C++
+#+BEGIN_SRC C++ :includes <iostream> <vector> <string>
 class Dog {
-  string* _name;
+  std::string* _name;
 public:
-  Dog(string name) {
-    _name = new string(name);
+  Dog(std::string name) {
+    _name = new std::string(name);
   }
   ~Dog() {
     delete _name;
@@ -222,18 +226,80 @@ public:
     std::cout << _name << std::endl;
   }
 };
+
+int main() {
+  std::vector<Dog> dogs;
+  dogs.push_back(Dog("Gunner"));
+  dogs.back().printName(); // error
+}
 #+END_SRC
 
-STL container of this class
-#+BEGIN_SRC C++
-vector<Dog> dogs;
-dogs.push_back(new Dog("Gunner"));
-dogs.back().printName(); // error
-#+END_SRC
+#+RESULTS:
 
 Solution:
-1. Define copy constructor and assignment operator
+1. Define copy constructor and assignment operator for deep copying
+
+#+BEGIN_SRC C++ :includes <iostream> <vector> <string>
+class Dog {
+  std::string* _name;
+public:
+  Dog(std::string name) {
+    _name = new std::string(name);
+  }
+  ~Dog() {
+    delete _name;
+  }
+  Dog(const Dog& rhs) { _name = new std::string(*(rhs.getName())); }
+  Dog& operator=(const Dog& rhs) { _name = new std::string(*(rhs.getName())); }
+  std::string* getName() const { return _name; }
+  void printName() const {
+    std::cout << *_name << std::endl;
+  }
+};
+
+int main() {
+  std::vector<Dog> dogs;
+  dogs.push_back(Dog("Gunner"));
+  dogs.back().printName();
+}
+#+END_SRC
+
+#+RESULTS:
+: Gunner
+
 2. Delete default copy constructor and assignment operator, then use vector<Dog *>
+
+#+BEGIN_SRC C++ :includes <iostream> <vector> <string>
+class Dog {
+  std::string* _name;
+public:
+  Dog(std::string name) {
+    _name = new std::string(name);
+  }
+  ~Dog() {
+    delete _name;
+  }
+  std::string* getName() const { return _name; }
+  void printName() const {
+    std::cout << *_name << std::endl;
+  }
+  Dog* clone() { return new Dog(*_name); } // define clone function if copying is needed
+private:
+  Dog(const Dog& rhs);
+  Dog& operator=(const Dog& rhs);
+};
+
+int main() {
+  std::vector<Dog *> dogs;
+  dogs.push_back(new Dog("Gunner"));
+  dogs.back()->printName();
+  // remember to delete all dogs
+}
+#+END_SRC
+
+#+RESULTS:
+: Gunner
+
 * Virtual Constructor
 #+BEGIN_SRC C++
 class Dog {
