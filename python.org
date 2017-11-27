@@ -1,0 +1,94 @@
+#+TITLE: Python
+
+* Coding conventions
+Follow the [PEP8](https://www.python.org/dev/peps/pep-0008/) style guide, use [pylint](https://www.pylint.org/) to check.
+** Whitespace
+• Use four spaces for each level of syntactically significant indenting.
+• Lines should be 79 characters in length or less.
+• In a file, functions and classes should be separated by two blank lines.
+• In a class, methods should be separated by one blank line.
+** Naming
+• Functions, variables, and attributes should be in ~lowercase_underscore~ format.
+• Protected instance attributes should be in ~_leading_underscore~ format.
+• Private instance attributes should be in ~__double_leading_underscore~ format.
+• Classes and exceptions should be in ~CapitalizedWord~ format.
+• Module-level constants should be in ~ALL_CAPS~ format.
+* Basic Python
+** Variable scope: LEGB rules
+** Lists, tuples, namedtuples, dicts, orderdicts, defaultdict, sets, frozensets
+** Sorting
+** Comprehensions
+** Lambda functions
+** Generators
+** Decorators
+** Context Manager
+** Logging
+** Testing
+*** docs test
+*** unit test
+* OOP
+** Classes
+*** classes vs instances
+*** class variables
+*** classmethods vs staticmethods
+*** property decorators
+*** special methods (double underscores)
+** Metaclasses
+A metaclass is defined as "the class of a class". By default, ~type~ is the metaclass of all classes.
+#+BEGIN_SRC python :results output
+class MyMeta(type):
+    def __new__(meta, name, bases, dct):
+        print '---------------------------------'
+        print 'Allocating memory for class', name
+        print meta
+        print bases
+        print dct
+        return super(MyMeta, meta).__new__(meta, name, bases, dct)
+
+    def __init__(cls, name, bases, dct):
+        print '---------------------------------'
+        print 'Initializing class', name
+        print cls
+        print bases
+        print dct
+        super(MyMeta, cls).__init__(name, bases, dct)
+
+    def __call__(cls, *args, **kwargs):
+        print '---------------------------------'
+        print '__call__ of ', str(cls)
+        print '__call__ *args=', str(args)
+        return type.__call__(cls, *args, **kwargs)
+
+
+class MyKlass(object):
+    __metaclass__ = MyMeta
+
+    def __init__(self, a, b):
+        print 'MyKlass object with a=%s, b=%s' % (a, b)
+
+
+print 'gonna create an instance of MyKlass...'
+foo = MyKlass(1, 2)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+---------------------------------
+Allocating memory for class MyKlass
+<class '__main__.MyMeta'>
+(<type 'object'>,)
+{'__module__': '__main__', '__metaclass__': <class '__main__.MyMeta'>, '__init__': <function __init__ at 0x7fb1c10bb6e0>}
+---------------------------------
+Initializing class MyKlass
+<class '__main__.MyKlass'>
+(<type 'object'>,)
+{'__module__': '__main__', '__metaclass__': <class '__main__.MyMeta'>, '__init__': <function __init__ at 0x7fb1c10bb6e0>}
+gonna create an instance of MyKlass...
+---------------------------------
+__call__ of  <class '__main__.MyKlass'>
+__call__ *args= (1, 2)
+MyKlass object with a=1, b=2
+#+end_example
+
+** Inheritance
+** Polyphormism
